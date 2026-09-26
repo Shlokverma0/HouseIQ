@@ -4,6 +4,7 @@ house.py
 Layer 2: Pydantic schemas for input validation and response formatting.
 """
 from enum import Enum
+from typing import List
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -90,5 +91,52 @@ class HouseFeatures(BaseModel):
 
 
 class PredictionResponse(BaseModel):
+    input_summary: dict
     predicted_price_in_lakhs: float
     currency: str = "INR"
+    disclaimer: str = "This is an ML-based estimate, not financial advice."
+
+
+# ============================================================
+# FUTURE PRICE PREDICTION (Category 1: Economic Factors)
+# ============================================================
+
+class FuturePredictionRequest(HouseFeatures):
+    """Extends HouseFeatures with economic factors for future forecasting."""
+    years: int = Field(..., gt=0, le=50, description="Number of years to forecast (1-50)")
+    inflation_rate: float = Field(0.06, gt=0, le=0.5, description="Annual inflation rate (e.g., 0.06 for 6%)")
+    interest_rate: float = Field(0.085, gt=0, le=0.5, description="Home loan interest rate (e.g., 0.085 for 8.5%)")
+    gdp_growth_rate: float = Field(0.07, gt=0, le=0.2, description="Annual GDP growth rate (e.g., 0.07 for 7%)")
+    migration_rate: float = Field(0.02, ge=0, le=0.2, description="Annual migration rate (e.g., 0.02 for 2%)")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "BHK": 3,
+                "Size_in_SqFt": 1500,
+                "Price_per_SqFt": 5000,
+                "Year_Built": 2015,
+                "Parking_Space": 1,
+                "location": "Mumbai",
+                "years": 10,
+                "inflation_rate": 0.06,
+                "interest_rate": 0.085,
+                "gdp_growth_rate": 0.07,
+                "migration_rate": 0.02,
+            }
+        }
+    }
+
+
+class YearlyPrice(BaseModel):
+    year: int
+    price_in_lakhs: float
+
+
+class FuturePredictionResponse(BaseModel):
+    input_summary: dict
+    current_price_in_lakhs: float
+    effective_growth_rate: float
+    forecast: List[YearlyPrice]
+    currency: str = "INR"
+    disclaimer: str = "This is an ML-based estimate, not financial advice."
