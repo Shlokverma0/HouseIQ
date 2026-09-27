@@ -26,3 +26,9 @@
 2026-09-27 01:21:44 - house_price_api - INFO - Current prediction requested: location=LocationEnum.mumbai, BHK=3
 2026-09-27 01:21:44 - house_price_api - INFO - Prediction result: 212.1 lakhs
 2026-09-27 01:21:44 - house_price_api - INFO - Forecast generated for 10 years, effective rate=0.1075
+2026-09-27 13:00:36 - house_price_api - INFO - Starting up House Price Prediction API...
+2026-09-27 13:00:52 - house_price_api - INFO - API ready to serve requests.
+2026-09-27 13:30:51 - house_price_api - INFO - Future prediction requested: location=LocationEnum.mumbai, years=10
+2026-09-27 13:30:51 - house_price_api - INFO - Current prediction requested: location=LocationEnum.mumbai, BHK=3
+2026-09-27 13:30:51 - house_price_api - INFO - Prediction result: 212.1 lakhs
+2026-09-27 13:30:51 - house_price_api - INFO - Forecast generated for 10 years, effective rate=0.1075
