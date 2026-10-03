@@ -1,15 +1,15 @@
-# 🏠 House Price Prediction API
+# HouseIQ
 
 <div align="center">
 
-**A production-grade ML REST API that predicts property prices and forecasts up to 50 years ahead using real economic factors.**
+**An ML REST API that predicts house prices and summarizes forecasts up to 50 years ahead using supplied economic assumptions.**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3%2B-F7931E.svg)](https://scikit-learn.org/)
 [![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063.svg)](https://docs.pydantic.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-9%2F9%20Passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-API%20tests%20included-blue.svg)]()
 
 </div>
 
@@ -36,12 +36,12 @@
 
 ## 🎯 Overview
 
-**House Price Prediction API** is a production-ready REST API that:
+**HouseIQ** is a REST API that:
 
 - Predicts **current property prices** in Indian cities based on property features.
-- Forecasts **future prices** (up to 50 years) using real economic indicators.
+- Forecasts **future prices** (up to 50 years) using economic rates supplied in the request.
 - Follows a **clean 4-Layer Architecture** for separation of concerns.
-- Includes **logging, rate limiting, input validation, and full test coverage**.
+- Includes **logging, rate limiting, input validation, and API tests**.
 
 Built with **FastAPI**, **scikit-learn**, and **Pydantic v2**, this project reflects how ML services are structured in real production environments.
 
@@ -51,13 +51,13 @@ Built with **FastAPI**, **scikit-learn**, and **Pydantic v2**, this project refl
 
 - 🤖 **ML-Powered Predictions** — Trained on 250,000+ real Indian property records.
 - 📈 **Future Forecasting** — Predicts prices up to 50 years ahead.
-- 🌍 **Economic Factor Modeling** — Uses Inflation, GDP Growth, Interest Rate, and Migration Rate.
+- 🌍 **Economic Assumptions** — Forecasts use inflation, GDP growth, interest, and migration rates supplied in the request.
 - 🏗️ **4-Layer Architecture** — Routes → Controllers → Services → Repositories.
 - ✅ **Strict Input Validation** — Pydantic v2 with enum-based city validation (41 cities).
 - 🚦 **Rate Limiting** — 30 requests/min per IP (`slowapi`).
 - 📝 **Centralized Logging** — Console + file-based logs.
 - ⚡ **Performance Monitoring** — `X-Process-Time` header on every response.
-- 🧪 **9/9 Test Coverage** — Positive and negative cases covered.
+- 🧪 **API Tests** — Root, health, prediction, and compact future forecast responses.
 - 📄 **Auto-Generated Docs** — Interactive Swagger UI + ReDoc.
 
 ---
@@ -113,7 +113,7 @@ Client Request
 ## 📁 Project Structure
 
 ```
-house-price-ml-api/
+HouseIQ/
 │
 ├── app/
 │   ├── main.py                         # FastAPI entrypoint
@@ -156,7 +156,7 @@ house-price-ml-api/
 │   └── train.py                        # Training script
 │
 ├── tests/
-│   └── test_api.py                     # 9 automated tests
+│   └── test_api.py                     # API tests
 │
 ├── requirements.txt
 ├── README.md
@@ -195,11 +195,7 @@ The dataset is **automatically downloaded** via `kagglehub` when you run `script
 
 ### 📈 Evaluation Metrics
 
-| Metric | Value |
-|--------|-------|
-| **MAE** | 77.28 |
-| **RMSE** | 97.11 |
-| **R² Score** | 0.510 |
+The training script prints MAE, RMSE, and R² for each run. Use the metrics from your latest training run when presenting the model. After changing preprocessing, retrain the model artifacts before relying on new predictions.
 
 ### 📦 Saved Artifacts
 
@@ -216,8 +212,8 @@ The dataset is **automatically downloaded** via `kagglehub` when you run `script
 ### 1️⃣ Clone the Repository
 
 ```bash
-git clone https://github.com/Shlokverma0/house-price-api.git
-cd house-price-api
+git clone https://github.com/Shlokverma0/house-price-api.git HouseIQ
+cd HouseIQ
 ```
 
 ### 2️⃣ Create Virtual Environment
@@ -257,6 +253,8 @@ This will:
 - Clean and preprocess the data
 - Train the Linear Regression model
 - Save `.pkl` artifacts to `models/` and cleaned data to `data/`
+
+Run this after changing training preprocessing so the model files reflect the current code. Kaggle credentials and network access are required to download the source dataset.
 
 ---
 
@@ -333,23 +331,26 @@ curl -X 'POST' \
 
 ```json
 {
-  "input_summary": {
-    "location": "Mumbai",
-    "BHK": 3,
-    "Size_in_SqFt": 1500,
-    "years": 10
-  },
   "current_price_in_lakhs": 239.32,
+  "current_price_display": "₹2.39 crore",
   "effective_growth_rate": 0.1075,
   "forecast": [
-    { "year": 1, "price_in_lakhs": 265.05 },
-    { "year": 2, "price_in_lakhs": 293.54 },
-    { "year": 10, "price_in_lakhs": 664.38 }
+    {
+      "period": "Years 1–10",
+      "start_year": 1,
+      "end_year": 10,
+      "previous_price_in_lakhs": 239.32,
+      "ending_price_in_lakhs": 664.38,
+      "previous_price_display": "₹2.39 crore",
+      "ending_price_display": "₹6.64 crore"
+    }
   ],
   "currency": "INR",
   "disclaimer": "This is an ML-based estimate, not financial advice."
 }
 ```
+
+Forecast output is grouped into 10-year periods to keep long forecasts readable. Each period shows the price before that period and its ending price. Amounts below ₹1 crore display in lakhs; amounts of ₹1 crore or more display in crores. Numeric price fields remain in lakhs for consistent calculations.
 
 ### 📐 Forecasting Formula
 
@@ -363,25 +364,12 @@ Future Price = Current Price × (1 + Effective Growth Rate) ^ Years
 
 ## 🧪 Test Coverage
 
-| Category | Tests | Status |
-|----------|-------|--------|
-| Positive Tests | 3 | ✅ Pass |
-| Negative Tests | 6 | ✅ Pass |
-| **Total** | **9** | **✅ 9/9 Pass** |
+The API test suite covers four behaviors:
 
-### Sample Test Cases
-
-| # | Test | Input | Expected |
-|---|------|-------|----------|
-| 1 | Valid Mumbai prediction | BHK=3, Mumbai | `200 OK` |
-| 2 | Synonym location | "Bombay" | `200 OK` (→ Mumbai) |
-| 3 | 50-year forecast | years=50 | `200 OK` |
-| 4 | Invalid city | "Atlantis" | `422` |
-| 5 | Negative BHK | BHK=-5 | `422` |
-| 6 | Years > 50 | years=100 | `422` |
-| 7 | Negative inflation | -0.05 | `422` |
-| 8 | Parking > 1 | Parking=2 | `422` |
-| 9 | Years = 0 | years=0 | `422` |
+- Root endpoint and HouseIQ title.
+- Health endpoint and model status.
+- Successful current-price prediction with a concise response.
+- A 50-year forecast summarized into five 10-year ranges.
 
 ### Run Tests
 

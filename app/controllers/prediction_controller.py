@@ -14,16 +14,7 @@ class PredictionController:
 
     def predict_price(self, features: HouseFeatures) -> PredictionResponse:
         price = self.service.predict(features)
-        input_summary = {
-            "location": str(features.location.value) if hasattr(features.location, "value") else str(features.location),
-            "BHK": features.BHK,
-            "Size_in_SqFt": features.Size_in_SqFt,
-            "Price_per_SqFt": features.Price_per_SqFt,
-            "Year_Built": features.Year_Built,
-            "Parking_Space": features.Parking_Space,
-        }
         return PredictionResponse(
-            input_summary=input_summary,
             predicted_price_in_lakhs=round(price, 2),
             currency="INR",
         )

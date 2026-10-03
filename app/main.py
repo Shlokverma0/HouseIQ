@@ -4,6 +4,7 @@ main.py
 App entrypoint. Loads model at startup, sets up middleware, and mounts routers.
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -15,10 +16,19 @@ from app.repositories.model_repository import model_repository
 from app.utils.logger import logger
 from app.utils.limiter import limiter  # Alag file se import karo
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting up HouseIQ...")
+    model_repository.load()
+    logger.info("API ready to serve requests.")
+    yield
+
+
 app = FastAPI(
-    title="House Price Prediction API",
+    title="HouseIQ",
     version="1.0.0",
-    description="Predict house price (in Lakhs INR) from property features.",
+    description="HouseIQ predicts current house prices and summarizes future price forecasts for Indian cities.",
+    lifespan=lifespan,
 )
 
 # Rate limiter setup
@@ -43,16 +53,9 @@ async def add_process_time_header(request: Request, call_next):
     return response
 
 
-@app.on_event("startup")
-def load_model():
-    logger.info("Starting up House Price Prediction API...")
-    model_repository.load()
-    logger.info("API ready to serve requests.")
-
-
 @app.get("/", tags=["Root"])
 def root():
-    return {"message": "House Price Prediction API is running."}
+    return {"message": "HouseIQ API is running."}
 
 
 @app.get("/health", tags=["Health"])

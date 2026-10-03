@@ -1,8 +1,7 @@
 """
 train.py
 --------
-Trains ML model with location premium multipliers so that
-location has a visible effect on predictions.
+Trains a house-price model from the dataset's original target values.
 """
 import os
 import joblib
@@ -34,9 +33,6 @@ def main():
     df['location'] = df['City']
     df['Parking_Space'] = df['Parking_Space'].map({'Yes': 1, 'No': 0}).fillna(0).astype(int)
 
-    # 🚨 FIX: Price_per_SqFt ko lakhs/sqft → rupees/sqft convert karo
-    df['Price_per_SqFt'] = df['Price_per_SqFt'] * 100000
-
     top_cities = df['location'].value_counts().nlargest(50).index
     df['location'] = df['location'].apply(lambda x: x if x in top_cities else 'Other')
 
@@ -48,27 +44,7 @@ def main():
 
     df = df.dropna(subset=[TARGET])
 
-    # 🎯 Location premium — model ko location ka asar sikhao
-    location_premium = {
-        'Mumbai': 1.40,
-        'New Delhi': 1.30,
-        'Bangalore': 1.20,
-        'Gurgaon': 1.20,
-        'Pune': 1.15,
-        'Hyderabad': 1.10,
-        'Chennai': 1.10,
-        'Noida': 1.10,
-        'Kolkata': 1.05,
-        'Ahmedabad': 1.00,
-        'Jaipur': 0.95,
-        'Lucknow': 0.85,
-        'Patna': 0.70,
-        'Haridwar': 0.60,
-    }
-    multiplier = df['City'].map(location_premium).fillna(0.90)
-    df[TARGET] = df[TARGET] * multiplier     # only location premium, keep in lakhs
-
-    # Ab filter karo features + target
+    # Keep observed target prices unchanged; city effects are learned from features.
     df = df[FEATURES + [TARGET]].copy()
 
     X = df[FEATURES]

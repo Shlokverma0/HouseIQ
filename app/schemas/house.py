@@ -91,7 +91,6 @@ class HouseFeatures(BaseModel):
 
 
 class PredictionResponse(BaseModel):
-    input_summary: dict
     predicted_price_in_lakhs: float
     currency: str = "INR"
     disclaimer: str = "This is an ML-based estimate, not financial advice."
@@ -128,15 +127,20 @@ class FuturePredictionRequest(HouseFeatures):
     }
 
 
-class YearlyPrice(BaseModel):
-    year: int
-    price_in_lakhs: float
+class ForecastPeriod(BaseModel):
+    period: str
+    start_year: int
+    end_year: int
+    previous_price_in_lakhs: float
+    ending_price_in_lakhs: float
+    previous_price_display: str
+    ending_price_display: str
 
 
 class FuturePredictionResponse(BaseModel):
-    input_summary: dict
     current_price_in_lakhs: float
+    current_price_display: str
     effective_growth_rate: float
-    forecast: List[YearlyPrice]
+    forecast: List[ForecastPeriod]
     currency: str = "INR"
     disclaimer: str = "This is an ML-based estimate, not financial advice."

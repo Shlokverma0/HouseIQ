@@ -3,13 +3,19 @@ from app.schemas.house import (
     HouseFeatures,
     FuturePredictionRequest,
     FuturePredictionResponse,
-    YearlyPrice,
+    ForecastPeriod,
 )
 from app.repositories.model_repository import model_repository
 from app.utils.logger import logger
 
 
 class PredictionService:
+
+    @staticmethod
+    def _format_price(price_in_lakhs: float) -> str:
+        if price_in_lakhs >= 100:
+            return f"₹{price_in_lakhs / 100:,.2f} crore"
+        return f"₹{price_in_lakhs:,.2f} lakh"
 
     def _prepare_features(self, features: HouseFeatures) -> pd.DataFrame:
         data = features.model_dump()
@@ -71,32 +77,34 @@ class PredictionService:
             - (request.interest_rate * 0.5)
         )
 
-        # Forecast
-        forecast = []
+        # Calculate yearly prices, then return compact 10-year ranges.
+        yearly_prices = {}
         for year in range(1, request.years + 1):
             future_price = current_price * ((1 + effective_rate) ** year)
-            forecast.append(YearlyPrice(year=year, price_in_lakhs=round(future_price, 2)))
+            yearly_prices[year] = round(future_price, 2)
+
+        forecast = []
+        for start_year in range(1, request.years + 1, 10):
+            end_year = min(start_year + 9, request.years)
+            previous_price = current_price if start_year == 1 else yearly_prices[start_year - 1]
+            ending_price = yearly_prices[end_year]
+            forecast.append(
+                ForecastPeriod(
+                    period=f"Years {start_year}–{end_year}",
+                    start_year=start_year,
+                    end_year=end_year,
+                    previous_price_in_lakhs=previous_price,
+                    ending_price_in_lakhs=ending_price,
+                    previous_price_display=self._format_price(previous_price),
+                    ending_price_display=self._format_price(ending_price),
+                )
+            )
 
         logger.info(f"Forecast generated for {request.years} years, effective rate={effective_rate:.4f}")
 
-        # Input summary banane ke liye
-        input_summary = {
-            "location": str(request.location.value) if hasattr(request.location, "value") else str(request.location),
-            "BHK": request.BHK,
-            "Size_in_SqFt": request.Size_in_SqFt,
-            "Price_per_SqFt": request.Price_per_SqFt,
-            "Year_Built": request.Year_Built,
-            "Parking_Space": request.Parking_Space,
-            "years": request.years,
-            "inflation_rate": request.inflation_rate,
-            "interest_rate": request.interest_rate,
-            "gdp_growth_rate": request.gdp_growth_rate,
-            "migration_rate": request.migration_rate,
-        }
-
         return FuturePredictionResponse(
-            input_summary=input_summary,
             current_price_in_lakhs=current_price,
+            current_price_display=self._format_price(current_price),
             effective_growth_rate=round(effective_rate, 4),
             forecast=forecast,
             currency="INR",

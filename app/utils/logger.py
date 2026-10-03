@@ -8,7 +8,7 @@ import sys
 import os
 
 # Logger configure karo
-logger = logging.getLogger("house_price_api")
+logger = logging.getLogger("houseiq")
 logger.setLevel(logging.INFO)
 
 # Duplicate handlers se bachne ke liye
