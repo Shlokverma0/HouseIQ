@@ -1,34 +1,34 @@
-import os
+"""Load the trained HouseIQ model and metadata."""
+import json
+from pathlib import Path
+
 import joblib
 
-# Project root folder (3 levels up from app/repositories/)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-MODEL_PATH = os.path.join(BASE_DIR, "models", "house_model.pkl")
-IMPUTER_PATH = os.path.join(BASE_DIR, "models", "house_imputer.pkl")
-COLUMNS_PATH = os.path.join(BASE_DIR, "models", "house_columns.pkl")
+BASE_DIR = Path(__file__).resolve().parents[2]
+MODEL_PATH = BASE_DIR / "models" / "house_model.pkl"
+COLUMNS_PATH = BASE_DIR / "models" / "house_columns.pkl"
+METADATA_PATH = BASE_DIR / "models" / "house_metadata.json"
 
 
 class ModelRepository:
     def __init__(self):
         self.model = None
-        self.imputer = None
-        self.columns = None
+        self.columns = []
+        self.metadata = {}
         self.loaded = False
 
     def load(self):
-        if not os.path.exists(MODEL_PATH):
+        missing = [path for path in (MODEL_PATH, COLUMNS_PATH, METADATA_PATH) if not path.exists()]
+        if missing:
+            names = ", ".join(str(path) for path in missing)
             raise FileNotFoundError(
-                f"Model file nahi mila: {MODEL_PATH}\n"
-                "Pehle 'python scripts/train.py' chalao."
+                f"HouseIQ model artifacts are missing: {names}. Run 'python scripts/train.py' first."
             )
-        
         self.model = joblib.load(MODEL_PATH)
-        self.imputer = joblib.load(IMPUTER_PATH)
         self.columns = joblib.load(COLUMNS_PATH)
+        self.metadata = json.loads(METADATA_PATH.read_text(encoding="utf-8"))
         self.loaded = True
-        print(f"[ModelRepository] Loaded model with {len(self.columns)} features.")
+        print(f"[ModelRepository] Loaded PSF model with {len(self.columns)} features.")
 
 
-# Global instance
 model_repository = ModelRepository()

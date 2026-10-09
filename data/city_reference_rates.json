@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "rate_unit": "INR per square foot",
+  "description": "Editable MagicBricks reference rates. Null values mean not set; never infer or fill them from the synthetic ML dataset.",
+  "cities": {
+    "Ahmedabad": {
+      "status": "average_only",
+      "typical": 6725,
+      "source": "MagicBricks, Flats for Sale in Ahmedabad; average-rate table",
+      "source_url": "https://www.magicbricks.com/flats-in-ahmedabad-for-sale-pppfs",
+      "source_date": "Apr-Jun 2026",
+      "accessed_date": "2026-10-09",
+      "notes": "Source gives an average only; low/high were not published clearly and are intentionally not set. Asking/reference rate, not a registered transaction price."
+    },
+    "Amritsar": {
+      "status": "not_set"
+    },
+    "Bangalore": {
+      "status": "set",
+      "low": 9800,
+      "typical": 12899,
+      "high": 13700,
+      "source": "MagicBricks, Flats for Sale in Bangalore; page range and Jan-Mar 2026 average-rate table",
+      "source_url": "https://www.magicbricks.com/flats-in-bangalore-for-sale-pppfs",
+      "source_date": "Jan-Mar 2026",
+      "accessed_date": "2026-10-09",
+      "notes": "Listing page gives a city flat-rate range of ₹9,800–₹13,700/sq ft and Jan-Mar 2026 average ₹12,899/sq ft. Listing/reference rates, not registered transaction prices."
+    },
+    "Bhopal": {
+      "status": "not_set"
+    },
+    "Bhubaneswar": {
+      "status": "not_set"
+    },
+    "Bilaspur": {
+      "status": "not_set"
+    },
+    "Chennai": {
+      "status": "average_only",
+      "typical": 10357,
+      "source": "MagicBricks, Flats for Sale in Chennai; average-rate table",
+      "source_url": "https://www.magicbricks.com/flats-in-chennai-for-sale-pppfs",
+      "source_date": "Jan-Mar 2026",
+      "accessed_date": "2026-10-09",
+      "notes": "Source gives an average only; low/high were not published clearly and are intentionally not set. Asking/reference rate, not a registered transaction price."
+    },
+    "Coimbatore": {
+      "status": "not_set"
+    },
+    "Cuttack": {
+      "status": "not_set"
+    },
+    "Dehradun": {
+      "status": "not_set"
+    },
+    "Durgapur": {
+      "status": "not_set"
+    },
+    "Dwarka": {
+      "status": "not_set"
+    },
+    "Faridabad": {
+      "status": "not_set"
+    },
+    "Gaya": {
+      "status": "not_set"
+    },
+    "Gurgaon": {
+      "status": "not_set"
+    },
+    "Guwahati": {
+      "status": "not_set"
+    },
+    "Haridwar": {
+      "status": "not_set"
+    },
+    "Hyderabad": {
+      "status": "set",
+      "low": 8200,
+      "typical": 9120,
+      "high": 10500,
+      "source": "MagicBricks, Flats for Sale in Hyderabad; Jan-Mar 2026 average-rate table and published flat-rate range",
+      "source_url": "https://www.magicbricks.com/flats-in-hyderabad-for-sale-pppfs",
+      "source_date": "Jan-Mar 2026",
+      "accessed_date": "2026-10-09",
+      "notes": "MagicBricks Research lists ₹9,120/sq ft average and flat rates from ₹8,200 to ₹10,500/sq ft. Asking/reference rates, not registered transaction prices."
+    },
+    "Indore": {
+      "status": "not_set"
+    },
+    "Jaipur": {
+      "status": "not_set"
+    },
+    "Jamshedpur": {
+      "status": "not_set"
+    },
+    "Jodhpur": {
+      "status": "not_set"
+    },
+    "Kochi": {
+      "status": "not_set"
+    },
+    "Kolkata": {
+      "status": "average_only",
+      "typical": 8632,
+      "source": "MagicBricks, Flats for Sale in Kolkata; average-rate table",
+      "source_url": "https://www.magicbricks.com/flats-in-kolkata-for-sale-pppfs",
+      "source_date": "Oct-Dec 2025",
+      "accessed_date": "2026-10-09",
+      "notes": "Source gives an average only; low/high were not published clearly and are intentionally not set. Asking/reference rate, not a registered transaction price."
+    },
+    "Lucknow": {
+      "status": "not_set"
+    },
+    "Ludhiana": {
+      "status": "not_set"
+    },
+    "Mangalore": {
+      "status": "not_set"
+    },
+    "Mumbai": {
+      "status": "set",
+      "low": 21700,
+      "typical": 37930,
+      "high": 40600,
+      "source": "MagicBricks, Flats for Sale in Mumbai; Q1 2026 average-rate table and stated flat-rate range",
+      "source_url": "https://www.magicbricks.com/flats-in-mumbai-for-sale-pppfs",
+      "source_date": "Jan-Mar 2026",
+      "accessed_date": "2026-10-09",
+      "notes": "Page states flats range ₹21,700–₹40,600/sq ft and Jan-Mar 2026 average ₹37,930/sq ft. Listing/reference rates, not registered transaction prices."
+    },
+    "Mysore": {
+      "status": "not_set"
+    },
+    "Nagpur": {
+      "status": "not_set"
+    },
+    "New Delhi": {
+      "status": "average_only",
+      "typical": 20333,
+      "source": "MagicBricks, Flats for Sale in New Delhi; average-rate table",
+      "source_url": "https://www.magicbricks.com/flats-in-new-delhi-for-sale-pppfs",
+      "source_date": "Jan-Mar 2026",
+      "accessed_date": "2026-10-09",
+      "notes": "Source gives an average only; low/high were not published clearly and are intentionally not set. Asking/reference rate, not a registered transaction price."
+    },
+    "Noida": {
+      "status": "not_set"
+    },
+    "Patna": {
+      "status": "not_set"
+    },
+    "Pune": {
+      "status": "set",
+      "low": 9200,
+      "typical": 12853,
+      "high": 13200,
+      "source": "MagicBricks, Flats for Sale in Pune; Jan-Mar 2026 average-rate table and published flat-rate range",
+      "source_url": "https://www.magicbricks.com/flats-in-pune-for-sale-pppfs",
+      "source_date": "Jan-Mar 2026",
+      "accessed_date": "2026-10-09",
+      "notes": "MagicBricks Research lists ₹12,853/sq ft average and flat rates from ₹9,200 to ₹13,200/sq ft. Asking/reference rates, not registered transaction prices."
+    },
+    "Raipur": {
+      "status": "not_set"
+    },
+    "Ranchi": {
+      "status": "not_set"
+    },
+    "Silchar": {
+      "status": "not_set"
+    },
+    "Surat": {
+      "status": "not_set"
+    },
+    "Trivandrum": {
+      "status": "not_set"
+    },
+    "Vijayawada": {
+      "status": "not_set"
+    },
+    "Vishakhapatnam": {
+      "status": "not_set"
+    },
+    "Warangal": {
+      "status": "not_set"
+    }
+  }
+}

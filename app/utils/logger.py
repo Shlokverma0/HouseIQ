@@ -1,34 +1,34 @@
-"""
-logger.py
----------
-Centralized logger for the entire application.
-"""
+"""Centralized application logging."""
 import logging
 import sys
-import os
+from pathlib import Path
 
-# Logger configure karo
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+LOG_DIR = PROJECT_ROOT / "logs"
+LOG_PATH = LOG_DIR / "app.log"
+
 logger = logging.getLogger("houseiq")
 logger.setLevel(logging.INFO)
+logger.propagate = False
 
-# Duplicate handlers se bachne ke liye
 if not logger.handlers:
-    # Console handler (terminal output)
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
-
-    # File handler (logs/app.log me save)
-    os.makedirs("logs", exist_ok=True)
-    file_handler = logging.FileHandler("logs/app.log", encoding="utf-8")
-    file_handler.setLevel(logging.INFO)
-
-    # Formatting
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
-    console_handler.setFormatter(formatter)
-    file_handler.setFormatter(formatter)
 
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+
+    try:
+        file_handler = logging.FileHandler(LOG_PATH, encoding="utf-8")
+    except OSError as exc:
+        # Console logging remains available in read-only or locked-down environments.
+        logger.warning("File logging unavailable at %s: %s", LOG_PATH, exc)
+    else:
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
