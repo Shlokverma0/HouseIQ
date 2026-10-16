@@ -4,8 +4,7 @@
 
 > **Demo limitations:** City reference rates are listing/reference prices, not registered sale prices. The ML training data is synthetic and its estimate is not comparable to real market prices. Forecasts are scenarios, not valuations or guarantees.
 
-<!-- Add the public demo URL here after deployment, e.g. https://houseiq-demo.onrender.com -->
-**Live demo:** Not deployed yet · **API docs:** available at `/docs` after starting the app.
+**Live demo:** [HouseIQ on Render](https://houseiq-1ttf.onrender.com/login) · **API docs:** [Swagger UI](https://houseiq-1ttf.onrender.com/docs)
 
 ## Screenshots
 
