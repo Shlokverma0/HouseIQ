@@ -1,426 +1,155 @@
 # HouseIQ
 
-<div align="center">
+**An Indian property estimate and forecast web app built with FastAPI and scikit-learn.** HouseIQ estimates a home's current value from a sourced city reference rate where available, then shows an illustrative forecast from user supplied economic assumptions. A synthetic-data ML model is included as a comparison demo.
 
-**A property estimate API using sourced city reference rates, with a synthetic-data ML comparison and assumption-based forecasts.**
+> **Demo limitations:** City reference rates are listing/reference prices, not registered sale prices. The ML training data is synthetic and its estimate is not comparable to real market prices. Forecasts are scenarios, not valuations or guarantees.
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg)](https://fastapi.tiangolo.com/)
-[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3%2B-F7931E.svg)](https://scikit-learn.org/)
-[![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063.svg)](https://docs.pydantic.dev/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-API%20tests%20included-blue.svg)]()
+<!-- Add the public demo URL here after deployment, e.g. https://houseiq-demo.onrender.com -->
+**Live demo:** Not deployed yet · **API docs:** available at `/docs` after starting the app.
 
-</div>
+## Screenshots
 
----
+The login screenshot below has been cropped and its personal form entries removed. The dashboard is served by the same FastAPI app after sign in.
 
-## 📖 Table of Contents
+![HouseIQ sign-in page](assets/screenshots/login-screen.png)
 
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [Architecture](#-architecture)
-- [Tech Stack](#-tech-stack)
-- [Project Structure](#-project-structure)
-- [Dataset](#-dataset)
-- [Model Details](#-model-details)
-- [Setup & Installation](#-setup--installation)
-- [Running the API](#-running-the-api)
-- [API Endpoints](#-api-endpoints)
-- [Example Request & Response](#-example-request--response)
-- [Test Coverage](#-test-coverage)
-- [Production Features](#-production-features)
-- [Author](#-author)
+## What it does
 
----
+- Estimates current property value with `city rate × area × small year/parking adjustments` when a city has a configured reference rate.
+- Lets users edit the rate, shows its source and reporting period, and provides a non-blocking warning when an entered value is far outside a configured source band.
+- Shows a **Locality spread range** only when the source provides low/high rates. Average-only source pages do not produce an invented range. Cities without a configured rate can still be estimated with a user-entered rate.
+- Displays a separate **Demo ML estimate** for comparison. It uses a synthetic Kaggle dataset and is not the main estimate.
+- Builds an assumptions-based future scenario (up to 50 years) from inflation, GDP growth, migration, and interest. It is not city-specific; long-run growth moves toward inflation.
+- Provides account registration/sign-in, signed HttpOnly JWT session cookies, password reset by emailed one-time code, and Google reCAPTCHA Enterprise score checks when configured.
+- Validates inputs in the browser and API, and exposes API docs through Swagger UI.
 
-## 🎯 Overview
+## Screens and request flow
 
-**HouseIQ** is a REST API that:
+![HouseIQ request and estimate flow](assets/houseiq-flow.svg)
 
-- Estimates current values from dated, editable MagicBricks reference rates where available.
-- Keeps the synthetic-data ML estimate as a secondary comparison only.
-- Forecasts **future prices** (up to 50 years) using economic rates supplied in the request.
-- Follows a **clean 4-Layer Architecture** for separation of concerns.
-- Includes **logging, rate limiting, input validation, and API tests**.
+The browser pages are `web/login.html` and `web/index.html`; FastAPI serves them at `/login` and `/app`. There is no separate frontend server to deploy.
 
-Built with **FastAPI**, **scikit-learn**, and **Pydantic v2**, this project reflects how ML services are structured in real production environments.
+## How estimates work
 
----
+### Main estimate: sourced reference rate
 
-## ✨ Key Features
+The primary value is calculated from the configured typical rate and property size, then adjusted slightly for year built and parking. The rate table is in [`data/city_reference_rates.json`](data/city_reference_rates.json). Each sourced entry stores a link, reporting period, access date, and notes. Current configured rates are from MagicBricks: Jan–Mar 2026 for most entries, Oct–Dec 2025 for Kolkata, and Apr–Jun 2026 for Ahmedabad. These are asking/reference rates, not registered transactions.
 
-- 🏘️ **Reference-Rate Estimate** — Uses low/typical/high MagicBricks source rates only where they have been recorded and dated.
-- 🤖 **Demo ML Comparison** — Trained on 250,000 synthetic Kaggle records; not real market data and not the main estimate.
-- 📈 **Future Forecasting** — Predicts prices up to 50 years ahead.
-- 🌍 **Economic Assumptions** — Forecasts use inflation, GDP growth, interest, and migration rates supplied in the request.
-- 🏗️ **4-Layer Architecture** — Routes → Controllers → Services → Repositories.
-- ✅ **Strict Input Validation** — Pydantic v2 with training-range size validation and 42 supported cities.
-- 🚦 **Rate Limiting** — 30 requests/min per IP (`slowapi`).
-- 📝 **Centralized Logging** — Console + file-based logs.
-- ⚡ **Performance Monitoring** — `X-Process-Time` header on every response.
-- 🧪 **API Tests** — Root, health, prediction, and compact future forecast responses.
-- 📄 **Auto-Generated Docs** — Interactive Swagger UI + ReDoc.
+There are 42 city choices; 34 have no configured source rate. Those cities are explicitly marked `not_set`. Users can enter their own rate to get a main estimate; HouseIQ does not scrape Google or fetch live prices. `average_only` entries show no locality range or out-of-range comparison warning because the source did not provide a clear low/high band.
 
----
+### Demo ML estimate: comparison only
 
-## 🏗 Architecture
+The saved scikit-learn model predicts INR per square foot from property attributes, and multiplies by area for the comparison value. It was trained from the [Indian House Price Prediction Dataset on Kaggle](https://www.kaggle.com/datasets/srisyra02/house-price-prediction-dataset), which describes its records as **synthetic**. The training pipeline cleans invalid/duplicate rows and reports held-out metrics; those metrics describe fit to the synthetic dataset only. The model is therefore useful for demonstrating data preparation, training, model persistence, and inference—not for claiming a real-market valuation.
 
-This project implements the **Controller-Service-Repository pattern** (a variant of Clean Architecture) with 4 distinct layers:
+### Future forecast
 
-| Layer | Folder | Responsibility |
-|-------|--------|----------------|
-| **1️⃣ Routes** | `app/routes/` | API endpoints, HTTP method definitions |
-| **2️⃣ Controllers** | `app/controllers/` | Request handling, response orchestration |
-| **3️⃣ Services** | `app/services/` | Business logic, feature engineering |
-| **4️⃣ Repositories** | `app/repositories/` | Model loading, data access |
-| **Support** | `app/schemas/` | Pydantic validation schemas |
-| **Support** | `app/utils/` | Logger & rate limiter |
+Forecast growth uses the supplied inflation, GDP growth, migration, and interest assumptions, with a bounded annual rate that gradually moves toward inflation over longer horizons. It is a general scenario, not a city-specific market forecast. Changing the forecast horizon does not change the current estimate.
 
-### 🔄 Request Flow
+## Tech stack
 
-```
-Client Request
-     ↓
-[ Routes ] → [ Controllers ] → [ Services ] → [ Repositories ] → Trained Model
-     ↑                                                                ↓
-     └────────────────────── JSON Response ───────────────────────────┘
-```
+| Area | Tools |
+|---|---|
+| API and web server | Python, FastAPI, Uvicorn |
+| Validation | Pydantic |
+| ML and data | scikit-learn, pandas, joblib |
+| Auth storage | SQLite |
+| Auth security | scrypt password hashes, HMAC-signed HS256 JWT cookies |
+| CAPTCHA and email | Google reCAPTCHA Enterprise assessments, SMTP OTP email |
+| Tests | pytest, httpx |
 
-**Benefits:**
-- ✅ **Separation of Concerns** — Each layer has a single responsibility.
-- ✅ **Testability** — Layers can be tested independently.
-- ✅ **Maintainability** — Model swaps require changes in only 1-2 layers.
-- ✅ **Scalability** — Teams can work on different layers in parallel.
+## Project layout
 
----
-
-## 🧰 Tech Stack
-
-| Category | Technology |
-|----------|-----------|
-| **Language** | Python 3.10+ |
-| **Web Framework** | FastAPI |
-| **Data Validation** | Pydantic v2 |
-| **ML Library** | scikit-learn |
-| **Data Processing** | pandas, NumPy |
-| **Model Serialization** | joblib |
-| **Dataset Download** | kagglehub |
-| **Server** | Uvicorn |
-| **Rate Limiting** | slowapi |
-| **Testing** | pytest, httpx |
-
----
-
-## 📁 Project Structure
-
-```
+```text
 HouseIQ/
-│
 ├── app/
-│   ├── main.py                         # FastAPI entrypoint
-│   ├── __init__.py
-│   │
-│   ├── routes/                         # 1️⃣ ROUTES LAYER
-│   │   ├── __init__.py
-│   │   └── predict.py
-│   │
-│   ├── controllers/                    # 2️⃣ CONTROLLER LAYER
-│   │   ├── __init__.py
-│   │   └── prediction_controller.py
-│   │
-│   ├── services/                       # 3️⃣ SERVICE LAYER
-│   │   ├── __init__.py
-│   │   └── prediction_service.py
-│   │
-│   ├── repositories/                   # 4️⃣ REPOSITORY LAYER
-│   │   ├── __init__.py
-│   │   └── model_repository.py
-│   │
-│   ├── schemas/                        # PYDANTIC VALIDATION
-│   │   ├── __init__.py
-│   │   └── house.py
-│   │
-│   └── utils/                          # UTILITIES
-│       ├── __init__.py
-│       ├── limiter.py                  # Rate limiter
-│       └── logger.py                   # Centralized logger
-│
-├── data/
-│   └── house_data_clean.csv            # Cleaned dataset
-│
-├── models/                             # ML ARTIFACTS
-│   ├── house_columns.pkl
-│   ├── house_imputer.pkl
-│   └── house_model.pkl
-│
-├── scripts/
-│   └── train.py                        # Training script
-│
-├── tests/
-│   └── test_api.py                     # API tests
-│
+│   ├── controllers/       # Prediction request handling
+│   ├── repositories/      # Saved ML model loading
+│   ├── routes/             # Prediction and authentication API routes
+│   ├── schemas/            # Request validation
+│   ├── services/           # Estimate, forecast, auth, and email logic
+│   ├── utils/              # Logging and rate limiting
+│   └── main.py             # FastAPI application and page routes
+├── assets/screenshots/     # README images
+├── data/                   # Training data and city-rate configuration
+├── models/                 # Saved model, feature columns, metadata
+├── scripts/train.py        # Model cleaning, training, and evaluation
+├── tests/                  # API, validation, and authentication tests
+├── web/                    # Login and estimate/forecast UI
 ├── requirements.txt
-├── README.md
-└── .gitignore
+└── README.md
 ```
 
----
+## Run locally (Windows PowerShell)
 
-## 📊 Dataset
+Open PowerShell in the project folder:
 
-- **Source:** [Indian House Price Prediction Dataset](https://www.kaggle.com/datasets/srisyra02/house-price-prediction-dataset), by Srimathy Sivanessan (srisyra02).
-- **Size:** 250,000 rows × 23 columns.
-- **Model target:** INR per square foot, derived as total price in lakhs × 100,000 ÷ size in square feet.
-
-The Kaggle source explicitly describes these as **synthetic residential property records** for educational and ML use, not actual market prices. Kaggle lists the license as CC0 Public Domain. In this source the reported Price_per_SqFt values are in lakh rupees per sq-ft; training derives the model target from total price and area to normalize it to INR/sq-ft. Rows with zero/invalid price rate, total price, or area are removed. Exact duplicate rows and IDs are checked. IQR-flagged price tails are reported and retained with absolute-error training so high-rate cases are not removed by an arbitrary threshold.
-
-### Features Used
-
-| Feature | Type | Description |
-|---------|------|-------------|
-| `BHK` | int | Bedrooms, Hall, Kitchen |
-| `Size_in_SqFt` | float | Property size in sq ft |
-| `Year_Built` | int | Year of construction |
-| `Parking_Space` | int | 1 = Yes, 0 = No |
-| City | one-hot | 42 source cities |
-| `rate_per_sqft` | finite optional input | Editable city rate used by the main estimate when configured |
-
-The dataset is **automatically downloaded** via `kagglehub` when you run `scripts/train.py`.
-
----
-
-## 📍 Main Reference-Rate Estimate
-
-The main estimate is **reference rate × property size × year/parking adjustment**; it is not ML-learned. Rates in `data/city_reference_rates.json` are MagicBricks listing/reference prices, not registered sale prices. The configured source periods are Jan–Mar 2026, except Kolkata (Oct–Dec 2025) and Ahmedabad (Apr–Jun 2026). Entries with a sourced band store low, typical, and high INR/sq ft values; entries whose source published only an average use `average_only` and deliberately omit low/high. Each configured entry records its source, URL, reporting period, access date, and notes. Of the 42 dropdown cities, 34 are `not_set`; users can enter a rate manually for those cities, without a locality range or source-based rate warning.
-
-The web form pre-fills the editable **Rate per sq ft** from the selected city's configured typical rate. Changing city replaces the value; **Reset to reference rate** restores it. If `city_reference_rates.json` changes, the prediction service detects the file's modification time and reloads the rates automatically; restart Uvicorn and refresh the browser if an already-open session still shows old content. A user-entered rate drives the main estimate (rate × size), followed by a transparent year adjustment of 0.25% per year from 2020 (capped at ±10%) and a 2% parking adjustment. Where source low/high values exist, the locality range is scaled around the edited rate and a non-blocking warning appears below half the configured low or above 1.5× the high. For average-only sources the UI says “Range unavailable: source gave only an average.” Unconfigured cities allow a manual estimate, with no source range or comparison warning. The live-rate link opens a Google search; the app does not fetch or scrape it. BHK is used for training-supported size validation.
-
-## 🤖 Demo ML Model (Comparison Only)
-
-- **Algorithm:** HistGradientBoostingRegressor with absolute-error loss.
-- **Target:** INR per square foot; the model remains available and is shown as **Demo ML model estimate (synthetic data, comparison only)**.
-- **Features:** BHK, size, year built, parking, and one-hot city. User-entered market rate is never sent to the model.
-- **Splits:** 70% train, 15% interval calibration, 15% held-out test.
-- **Forecast:** Assumptions-based, not city-specific; growth is capped at 2%–12% and gradually approaches capped inflation.
-
-The ML estimate is secondary because the Kaggle source explicitly contains synthetic records; price has little meaningful relationship to size, city, or BHK in that dataset. Its held-out MAPE is about 118%, describing fit to synthetic data only. The model demonstrates the training/inference pipeline and provides a comparison; it is not comparable to real prices and is not the main estimate. A missing source rate stays unset rather than falling back to the synthetic model.
-
-Future forecasts are assumption-based and not city-specific. Inflation is the main long-run growth driver: the initial scenario also considers GDP growth, migration, and interest, while long-horizon growth gradually approaches capped inflation.
-
-### 📈 Evaluation Metrics
-
-Training prints held-out R², MAE, MAPE, 90% interval calibration/coverage, and grouped permutation importance. These metrics describe fit to the synthetic Kaggle data only; they do not establish accuracy for real property prices.
-
-### 📦 Saved Artifacts
-
-| File | Purpose |
-|------|---------|
-| house_model.pkl | Trained PSF model |
-| house_columns.pkl | Exact feature column order |
-| house_metadata.json | Training limits, source counts, metrics, and interval calibration |
-
-------|---------|
-| `house_model.pkl` | Trained LinearRegression model |
-| `house_imputer.pkl` | Fitted SimpleImputer |
-| `house_columns.pkl` | Exact column order for inference |
-
----
-
-## ⚙️ Setup & Installation
-
-### 1️⃣ Clone the Repository
-
-```bash
-git clone https://github.com/Shlokverma0/house-price-api.git HouseIQ
-cd HouseIQ
-```
-
-### 2️⃣ Create Virtual Environment
-
-```bash
+```powershell
 python -m venv venv
-```
-
-**Activate:**
-
-- **Windows:** `.\venv\Scripts\activate`
-- **macOS/Linux:** `source venv/bin/activate`
-
-### 3️⃣ Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4️⃣ Configure Kaggle Credentials
-
-To download the dataset, you need Kaggle API credentials:
-
-1. Go to [kaggle.com/settings](https://www.kaggle.com/settings) → **API** → **Create New Token**
-2. Place `kaggle.json` in:
-   - **Windows:** `C:\Users\<username>\.kaggle\kaggle.json`
-   - **macOS/Linux:** `~/.kaggle/kaggle.json`
-
-### 5️⃣ Train the Model
-
-```bash
-python scripts/train.py
-```
-
-This will:
-- Download the dataset from Kaggle
-- Clean and preprocess the data
-- Train the Linear Regression model
-- Save `.pkl` artifacts to `models/` and cleaned data to `data/`
-
-Run this after changing training preprocessing so the model files reflect the current code. Kaggle credentials and network access are required to download the source dataset.
-
----
-
-## 🚀 Running the API
-
-Start the FastAPI server:
-
-```bash
+.\venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+$env:AUTH_SECRET_KEY = (python -c "import secrets; print(secrets.token_urlsafe(48))")
 python -m uvicorn app.main:app --reload
 ```
 
-**Available URLs:**
+Open `http://127.0.0.1:8000/login`, create an account, and sign in. The estimate app is at `http://127.0.0.1:8000/app`; API documentation is at `http://127.0.0.1:8000/docs`.
 
-| URL | Purpose |
-|-----|---------|
-| `http://127.0.0.1:8000/app` | HouseIQ property estimate and forecast dashboard |
-| `http://127.0.0.1:8000/` | API root |
-| `http://127.0.0.1:8000/docs` | Swagger UI (interactive) |
-| `http://127.0.0.1:8000/redoc` | ReDoc documentation |
-| `http://127.0.0.1:8000/health` | Health check |
+For local development, CAPTCHA is disabled if all reCAPTCHA settings are omitted. To exercise password-reset email locally, configure SMTP environment variables in the same terminal before starting Uvicorn. Never put credentials in the README, source code, screenshots, or Git history.
 
----
+## API endpoints
 
-## 🔌 API Endpoints
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | App/model health |
+| `GET` | `/metadata` | Model and supported-input metadata |
+| `GET` | `/city-rates` | City reference-rate configuration |
+| `POST` | `/predict` | Current estimate |
+| `POST` | `/predict/future` | Current estimate plus forecast |
+| `POST` | `/auth/register` | Create account |
+| `POST` | `/auth/login` | Sign in |
+| `POST` | `/auth/logout` | Sign out |
+| `POST` | `/auth/forgot-password` | Request email OTP |
+| `POST` | `/auth/verify-reset-otp` | Verify reset OTP |
+| `POST` | `/auth/reset-password` | Save new password |
 
-| Method | Endpoint | Description | Rate Limit |
-|--------|----------|-------------|------------|
-| `GET` | `/` | Root — welcome message | — |
-| `GET` | `/health` | Health check + model status | — |
-| `POST` | `/predict` | Predict current house price | 30/min |
-| `POST` | `/predict/future` | Forecast prices for N years | 10/min |
+Prediction routes require a signed-in account. `/docs` provides interactive request schemas and responses.
 
-The dashboard is served by the FastAPI app at `/app`; it uses the same-origin prediction endpoints and does not need a separate frontend server.
+## Deploy to Render
 
-### Forecast assumptions
+The app is a single FastAPI web service; deploy the repository root, not `web/` as a separate static site. Render's FastAPI guide uses `pip install -r requirements.txt` and a Uvicorn command bound to `0.0.0.0` and Render's `$PORT`. See [Render's FastAPI guide](https://render.com/docs/deploy-fastapi).
 
-The future endpoint starts from the current reference-rate estimate and compounds a user-assumptions scenario. The initial rate combines inflation, GDP growth, migration, and interest, is capped at 2%–12%, and gradually moves toward inflation over the horizon. It is not city-specific or trained on future economic data. If a city reference rate is unset, the API returns no reference forecast and explains why; it still returns the demo ML comparison.
+1. Push the project to GitHub and sign in at [Render](https://render.com/).
+2. Choose **New → Web Service**, connect `Shlokverma0/HouseIQ`, select branch `main`, and choose the Python runtime.
+3. Enter these commands:
 
-### Request Fields (for `/predict/future`)
+   **Build:** `pip install -r requirements.txt`
+   **Start:** `python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
-| Field | Type | Constraint | Description |
-|-------|------|------------|-------------|
-| `BHK` | int | 1–5 | Used for training-supported size validation; it does not change the main reference estimate |
-| `Size_in_SqFt` | integer | 500–5000, also checked against the selected BHK's training range | Property size |
-| `rate_per_sqft` | finite number | 1,000–150,000 | Editable INR/sq ft; a manual rate can be used when a city is not configured |
-| `Year_Built` | integer | 1900–current year (dynamic) | Registry/construction year; years before 1990 receive a rough-extrapolation warning |
-| `Parking_Space` | int | 0 or 1 | Parking availability |
-| `location` | enum | 42 cities | Property city; reference estimate is available only where a sourced rate is set |
-| `years` | int | 1–50 | Forecast horizon |
-| `inflation_rate` | finite number | 0–0.15 | Annual inflation as a decimal fraction |
-| `interest_rate` | finite number | 0.01–0.20 | Home loan rate as a decimal fraction |
-| `gdp_growth_rate` | finite number | -0.05–0.15 | GDP growth as a decimal fraction |
-| `migration_rate` | finite number | 0–0.10 | Migration as a decimal fraction |
-| `gdp_growth_rate` | float | 0–0.2 | GDP growth |
-| `migration_rate` | float | 0–0.2 | Migration rate |
+4. Add deployment environment variables in Render's **Environment** page, then deploy:
 
----
+   | Variable | Value |
+   |---|---|
+   | `APP_ENV` | `production` |
+   | `AUTH_SECRET_KEY` | A new random secret, at least 32 characters; generate one and keep it private |
+   | `RECAPTCHA_SITE_KEY` | Your reCAPTCHA Enterprise website key (public site key) |
+   | `RECAPTCHA_PROJECT_ID` | The Google Cloud project ID containing the key |
+   | `RECAPTCHA_API_KEY` | A server-side API key restricted to reCAPTCHA Enterprise API; keep private |
+   | `SMTP_HOST` | SMTP provider host |
+   | `SMTP_PORT` | SMTP port allowed by your hosting plan/provider |
+   | `SMTP_USERNAME` | SMTP username |
+   | `SMTP_PASSWORD` | SMTP/app password; keep private |
+   | `SMTP_FROM` | Verified sender address |
 
-## 📥 Example Request & Response
+   Do not copy `.env` into the repository or paste secrets into GitHub. In Google reCAPTCHA settings, add the exact deployed `onrender.com` hostname to the key's allowed domains. After saving environment variables, redeploy and check Render logs and `/health`.
 
-### Request
+5. Open the generated `https://<service-name>.onrender.com/login`, create an account, then test the estimate screen, CAPTCHA, and API docs. Put the final URL in the Live Demo line at the top of this README and in your resume.
 
-```bash
-curl -X 'POST' \
-  'http://127.0.0.1:8000/predict/future' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "BHK": 3,
-    "Size_in_SqFt": 1500,
-    "rate_per_sqft": 37930,
-    "Year_Built": 2015,
-    "Parking_Space": 1,
-    "location": "Mumbai",
-    "years": 10,
-    "inflation_rate": 0.06,
-    "interest_rate": 0.085,
-    "gdp_growth_rate": 0.07,
-    "migration_rate": 0.02
-  }'
-```
+### Hosting notes for this app
 
-### Response
+Render Free services sleep after inactivity and use an ephemeral filesystem: the SQLite account database can be lost on restart, spin-down, or redeploy. Free web services also block outbound SMTP ports 25, 465, and 587, so this app's current SMTP password-reset flow will not work on the free tier with those ports. See [Render's free-service limits](https://render.com/docs/free). For a durable public demo, use a persistent database (for example, migrate auth storage to managed Postgres) and an email delivery provider/plan supported by your host. The current code uses SQLite and direct SMTP; do not present those as production-durable until migrated and verified.
 
-The API returns the main reference-rate estimate and its **Locality spread range** from configured low/typical/high source rates, plus the separate demo ML comparison estimate. Forecast period ranges propagate the source locality spread through the chosen assumptions; they do not represent a probability or confidence interval. Browser validation shows inline errors and disables submission while invalid; the API independently rejects out-of-range, non-finite, empty, and fractional size/year values.
+## Resume entry
 
-Forecast output is grouped into 10-year periods to keep long forecasts readable. Each period shows the price before that period and its ending price. Amounts below ₹1 crore display in lakhs; amounts of ₹1 crore or more display in crores. Numeric price fields remain in lakhs for consistent calculations.
+After deployment succeeds, use a truthful entry such as:
 
-### 📐 Forecasting Formula
-
-The short-run rate uses the submitted inflation, GDP growth, migration, and interest assumptions. It is capped at 2%–12%. Each year's rate gradually moves toward the inflation assumption (also capped at 2%–12%). It does not use city-specific growth because the dataset has no time-series market history.
-
----
-
-## 🧪 Test Coverage
-
-The API test suite covers validation, reference-rate × area arithmetic, source metadata, separate demo ML results, unset-city behavior for current/future API requests, long-run growth, and API health.
-
-- Root endpoint and HouseIQ title.
-- Health endpoint and model status.
-- Successful current-price prediction with a concise response.
-- A 50-year forecast summarized into five 10-year ranges.
-
-### Run Tests
-
-```bash
-python -m pytest tests/test_api.py -v
-```
-
----
-
-## 🚀 Production Features
-
-| Feature | Implementation |
-|---------|---------------|
-| **Rate Limiting** | `slowapi` — 30 req/min per IP |
-| **Logging** | Console + `logs/app.log` file |
-| **Input Validation** | Pydantic v2 with enum cities |
-| **Performance Monitoring** | `X-Process-Time` header |
-| **CORS** | Enabled for all origins |
-| **Auto Docs** | Swagger UI + ReDoc |
-| **Error Handling** | Structured `422` validation errors |
-
----
-
-## 👨‍💻 Author
-
-**Shlok Verma**  
-Full-Stack Developer & AI/ML Engineer
-
-- 🐙 GitHub: [@Shlokverma0](https://github.com/Shlokverma0)
-- 💼 LinkedIn: [shlok-verma](https://www.linkedin.com/in/shlok-verma-113713363)
-- 📧 Email: vshlok24@gmail.com
-
----
-
-## 🙏 Acknowledgements
-
-- [Kaggle](https://www.kaggle.com/) for the dataset
-- [FastAPI](https://fastapi.tiangolo.com/) for the excellent framework
-- [scikit-learn](https://scikit-learn.org/) for ML tools
-- [slowapi](https://github.com/laurentS/slowapi) for rate limiting
-
----
-
-<div align="center">
-
-**⭐ If you found this project useful, please consider giving it a star! ⭐**
-
-</div>
+> **HouseIQ — Indian Property Estimate & Forecast App** | Python, FastAPI, scikit-learn, SQLite
+> Built a web app that estimates property values from sourced city reference rates, compares results with a synthetic-data ML model, and generates assumption-based forecasts. Implemented validated prediction APIs, account authentication, email OTP password reset, and CAPTCHA integration. **Live:** `<your deployed URL>` · **Code:** `https://github.com/Shlokverma0/HouseIQ`

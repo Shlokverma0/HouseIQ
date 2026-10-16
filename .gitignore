@@ -3,5 +3,8 @@ __pycache__/
 *.pyc
 venv/
 .env
+*.sqlite3
+*.db
 .pytest_cache/
 logs/
+.venv/

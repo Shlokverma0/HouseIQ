@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="360" viewBox="0 0 1120 360" role="img" aria-labelledby="title desc">
+  <title id="title">HouseIQ request flow</title>
+  <desc id="desc">A browser sends requests to FastAPI, which coordinates authentication, city reference rates, and the demo machine-learning model before returning estimates and forecasts.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 10 5 0 10Z" fill="#527565"/></marker>
+    <style>
+      .box{fill:#fff;stroke:#dce6df;stroke-width:2}.title{font:700 18px Arial,sans-serif;fill:#15382d}.sub{font:14px Arial,sans-serif;fill:#667b70}.line{stroke:#527565;stroke-width:2.5;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1120" height="360" rx="22" fill="#f3f7f4"/>
+  <text x="40" y="48" class="title" font-size="22">HouseIQ · how a request becomes an estimate</text>
+  <rect x="40" y="130" width="190" height="100" rx="16" class="box"/>
+  <text x="135" y="172" text-anchor="middle" class="title">Browser UI</text><text x="135" y="198" text-anchor="middle" class="sub">Login · property inputs</text>
+  <rect x="310" y="130" width="190" height="100" rx="16" class="box"/>
+  <text x="405" y="172" text-anchor="middle" class="title">FastAPI</text><text x="405" y="198" text-anchor="middle" class="sub">Routes · validation</text>
+  <rect x="590" y="72" width="220" height="86" rx="16" class="box"/>
+  <text x="700" y="108" text-anchor="middle" class="title">Reference-rate estimate</text><text x="700" y="133" text-anchor="middle" class="sub">City rate × area ± adjustments</text>
+  <rect x="590" y="202" width="220" height="86" rx="16" class="box"/>
+  <text x="700" y="238" text-anchor="middle" class="title">Demo ML comparison</text><text x="700" y="263" text-anchor="middle" class="sub">Synthetic Kaggle data only</text>
+  <rect x="900" y="130" width="180" height="100" rx="16" class="box"/>
+  <text x="990" y="172" text-anchor="middle" class="title">Result</text><text x="990" y="198" text-anchor="middle" class="sub">Estimate · forecast</text>
+  <path d="M230 180H300" class="line"/><path d="M500 160C535 160 545 115 580 115" class="line"/><path d="M500 200C535 200 545 245 580 245" class="line"/>
+  <path d="M810 115C850 115 850 160 890 160" class="line"/><path d="M810 245C850 245 850 200 890 200" class="line"/>
+  <text x="405" y="312" text-anchor="middle" class="sub">Protected account flows use SQLite, JWT cookies, email OTP, and configured reCAPTCHA.</text>
+</svg>

@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from app.schemas.house import HouseFeatures, FuturePredictionRequest
 from app.services import prediction_service as prediction_service_module
 from app.services.prediction_service import PredictionService
-from app.main import city_rates, dashboard
+from app.main import city_rates
 
 
 def features(**overrides):
@@ -109,7 +109,8 @@ def test_configured_city_rate_edit_changes_main_value():
 
 
 def test_dashboard_has_city_autofill_reset_and_dynamic_year_limit():
-    html = dashboard().body.decode("utf-8")
+    html = (Path(__file__).resolve().parents[1] / "web" / "index.html").read_text(encoding="utf-8")
+    html = html.replace("__CURRENT_YEAR__", str(date.today().year))
     assert 'citySelect.addEventListener("change",syncRateForCity)' in html
     assert "rateInput.value=String(entry.typical)" in html
     assert "Reset to reference rate" in html

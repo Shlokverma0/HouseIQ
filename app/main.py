@@ -9,9 +9,10 @@ from pathlib import Path
 import math
 
 from fastapi import FastAPI, Request
+from fastapi import Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -20,6 +21,8 @@ from datetime import date
 import json
 
 from app.routes.predict import router as predict_router
+from app.routes.auth import router as auth_router
+from app.services.auth_service import current_user
 from app.repositories.model_repository import model_repository
 from app.utils.logger import logger
 from app.utils.limiter import limiter
@@ -107,9 +110,18 @@ def metadata():
 
 
 @app.get("/app", include_in_schema=False)
-def dashboard():
+def dashboard(request: Request):
+    try:
+        current_user(request)
+    except HTTPException:
+        return RedirectResponse("/login", status_code=303)
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     return HTMLResponse(html.replace("__CURRENT_YEAR__", str(date.today().year)))
+
+
+@app.get("/login", include_in_schema=False)
+def login_page():
+    return HTMLResponse((WEB_DIR / "login.html").read_text(encoding="utf-8"))
 
 
 @app.get("/city-rates", tags=["Reference rates"])
@@ -117,4 +129,5 @@ def city_rates():
     return json.loads((BASE_DIR / "data" / "city_reference_rates.json").read_text(encoding="utf-8"))
 
 
-app.include_router(predict_router, tags=["Prediction"])
+app.include_router(auth_router)
+app.include_router(predict_router, tags=["Prediction"], dependencies=[Depends(current_user)])

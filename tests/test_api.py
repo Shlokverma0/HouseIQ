@@ -3,9 +3,12 @@ from copy import deepcopy
 from datetime import date
 import asyncio
 import json
+import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
+from uuid import uuid4
 
 import httpx
 import pytest
@@ -14,6 +17,7 @@ from app.main import app
 from app.schemas.house import FuturePredictionRequest
 from app.services.prediction_service import PredictionService
 from app.repositories.model_repository import model_repository
+from app.services import auth_service
 
 
 class SyncASGIClient:
@@ -21,10 +25,15 @@ class SyncASGIClient:
     def _request(self, method, path, **kwargs):
         async def send():
             async with httpx.AsyncClient(
-                transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+                transport=httpx.ASGITransport(app=app), base_url="http://testserver", cookies=self.cookies
             ) as client:
-                return await client.request(method, path, **kwargs)
+                response = await client.request(method, path, **kwargs)
+                self.cookies.update(response.cookies)
+                return response
         return asyncio.run(send())
+
+    def __init__(self):
+        self.cookies = httpx.Cookies()
 
     def get(self, path, **kwargs):
         return self._request("GET", path, **kwargs)
@@ -36,7 +45,14 @@ class SyncASGIClient:
 @pytest.fixture(scope="module")
 def client():
     model_repository.load()
-    yield SyncASGIClient()
+    os.environ["APP_ENV"] = "test"
+    os.environ["AUTH_SECRET_KEY"] = "test-only-houseiq-auth-key-1234567890"
+    auth_service.DB_PATH = Path(__file__).resolve().parents[1] / ".pytest_cache" / f"api-auth-{uuid4().hex}.sqlite3"
+    test_client = SyncASGIClient()
+    response = test_client.post("/auth/register", json={"email": f"tester-{uuid4().hex}@example.com", "password": "test-password-123"})
+    assert response.status_code == 201, response.text
+    yield test_client
+    auth_service.DB_PATH.unlink(missing_ok=True)
 
 
 @pytest.fixture

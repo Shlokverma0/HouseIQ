@@ -19,7 +19,7 @@
   <main class="shell">
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m3 11 9-7 9 7v9a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>HouseIQ</div>
-      <div class="top-right"><span>Indian property intelligence</span><span class="status"><i class="dot" id="healthDot"></i><span id="healthText">Checking model…</span></span></div>
+      <div class="top-right"><span>Indian property intelligence</span><span class="status"><i class="dot" id="healthDot"></i><span id="healthText">Checking model…</span></span><button type="button" id="logoutButton" class="link-button">Sign out</button></div>
     </header>
     <section class="hero"><div><p class="eyebrow">Property insights</p><h1>Know your home's<br>potential.</h1><p>Estimate a property's value today and explore how it could grow over time.</p></div><div class="hero-note">Demo only · synthetic Kaggle training data · not real market prices.</div></section>
     <div class="layout">
@@ -91,6 +91,7 @@
       fetch("/metadata").then(r=>r.ok?r.json():Promise.reject()).then(info=>{sizeLimits=info.bhk_limits||{};trainingYearMin=info.year_min||1990;trainingYearMax=info.year_max||2023;updateSizeLimits();updateYearHint()}).catch(()=>{});
       fetch("/city-rates").then(r=>r.ok?r.json():Promise.reject()).then(data=>{cityRates=data.cities||{};ratesReady=true;citySelect.querySelectorAll("option").forEach(option=>{const entry=cityRates[option.value];option.textContent=hasCityRate(entry)?option.value:`${option.value} (enter rate)`});syncRateForCity()}).catch(()=>{$("rateHint").textContent="Could not load local city-rate configuration. Check API.";ratesReady=false;validateForm()});
       fetch("/health").then(r=>r.json()).then(data=>{const ready=Boolean(data.model_loaded);$("healthDot").classList.toggle("offline",!ready);$("healthText").textContent=ready?"Model ready":"Model unavailable"}).catch(()=>{$("healthDot").classList.add("offline");$("healthText").textContent="API unavailable"});
+      $("logoutButton").addEventListener("click",async()=>{await fetch("/auth/logout",{method:"POST",credentials:"same-origin"});location.href="/login"});
       $("Year_Built").addEventListener("input",updateYearHint);
     })();
   </script>
