@@ -1,6 +1,7 @@
 """Integration checks for account login, JWT protection, CAPTCHA, and email OTP reset."""
 import asyncio
 import smtplib
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -129,6 +130,137 @@ def test_demo_user_not_created_when_environment_is_missing(auth_env, monkeypatch
     _run_startup(monkeypatch)
 
     assert not auth_env.exists()
+
+
+def _mock_google_verification(monkeypatch, claims=None, error=None):
+    from google.oauth2 import id_token
+
+    def verify(credential, request, audience):
+        assert credential == "mock-google-id-token"
+        assert audience == "houseiq-client-id.apps.googleusercontent.com"
+        if error:
+            raise error
+        return claims
+
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "houseiq-client-id.apps.googleusercontent.com")
+    monkeypatch.setattr(id_token, "verify_oauth2_token", verify)
+
+
+def _google_claims(**overrides):
+    claims = {
+        "iss": "https://accounts.google.com",
+        "aud": "houseiq-client-id.apps.googleusercontent.com",
+        "exp": int(time.time()) + 600,
+        "email_verified": True,
+        "email": f"google-{uuid4().hex}@example.com",
+        "sub": f"google-sub-{uuid4().hex}",
+    }
+    claims.update(overrides)
+    return claims
+
+
+def test_google_valid_token_creates_session_cookie(auth_env, monkeypatch):
+    claims = _google_claims()
+    _mock_google_verification(monkeypatch, claims=claims)
+
+    client = SyncASGIClient()
+    response = client.post("/auth/google", json={"credential": "mock-google-id-token"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["user"]["email"] == claims["email"]
+    assert any(cookie.name == "houseiq_access" for cookie in client.cookies.jar)
+    assert client.get("/auth/me").json()["user"]["email"] == claims["email"]
+
+
+def test_google_login_does_not_require_recaptcha(auth_env, monkeypatch):
+    _mock_google_verification(monkeypatch, claims=_google_claims())
+    monkeypatch.setattr(auth_service, "verify_captcha", lambda *args, **kwargs: False)
+
+    response = SyncASGIClient().post("/auth/google", json={"credential": "mock-google-id-token"})
+
+    assert response.status_code == 200, response.text
+
+
+def test_google_wrong_audience_is_rejected(auth_env, monkeypatch):
+    _mock_google_verification(monkeypatch, error=ValueError("Wrong recipient"))
+
+    response = SyncASGIClient().post("/auth/google", json={"credential": "mock-google-id-token"})
+
+    assert response.status_code == 401
+    assert "audience" in response.json()["detail"].lower()
+
+
+def test_google_unverified_email_is_rejected(auth_env, monkeypatch):
+    _mock_google_verification(monkeypatch, claims=_google_claims(email_verified=False))
+
+    response = SyncASGIClient().post("/auth/google", json={"credential": "mock-google-id-token"})
+
+    assert response.status_code == 401
+    assert "email is not verified" in response.json()["detail"]
+
+
+def test_google_expired_token_is_rejected(auth_env, monkeypatch):
+    _mock_google_verification(monkeypatch, error=ValueError("Token expired"))
+
+    response = SyncASGIClient().post("/auth/google", json={"credential": "mock-google-id-token"})
+
+    assert response.status_code == 401
+    assert "expired" in response.json()["detail"].lower()
+
+
+def test_google_login_links_existing_password_account(auth_env, monkeypatch):
+    claims = _google_claims(email=f"existing-{uuid4().hex}@example.com")
+    _mock_google_verification(monkeypatch, claims=claims)
+    with auth_service._db() as db:
+        db.execute(
+            "INSERT INTO users(email,password_hash,created_at) VALUES(?,?,?)",
+            (claims["email"], auth_service._password_hash("correct-horse-battery"), int(time.time())),
+        )
+        password_hash = db.execute("SELECT password_hash FROM users WHERE email=?", (claims["email"],)).fetchone()[0]
+
+    response = SyncASGIClient().post("/auth/google", json={"credential": "mock-google-id-token"})
+
+    assert response.status_code == 200, response.text
+    with auth_service._db() as db:
+        user = db.execute("SELECT password_hash,google_sub FROM users WHERE email=?", (claims["email"],)).fetchone()
+        assert user["password_hash"] == password_hash
+        assert user["google_sub"] == claims["sub"]
+
+
+def test_google_creates_passwordless_account_using_only_verified_token_email(auth_env, monkeypatch):
+    claims = _google_claims()
+    _mock_google_verification(monkeypatch, claims=claims)
+
+    response = SyncASGIClient().post(
+        "/auth/google",
+        json={"credential": "mock-google-id-token", "email": "attacker@example.test"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["user"]["email"] == claims["email"]
+    with auth_service._db() as db:
+        user = db.execute("SELECT password_hash,google_sub FROM users WHERE email=?", (claims["email"],)).fetchone()
+        assert user["password_hash"] == ""
+        assert user["google_sub"] == claims["sub"]
+    password_login = SyncASGIClient().post(
+        "/auth/login", json={"email": claims["email"], "password": "anything"}
+    )
+    assert password_login.status_code == 401
+    assert password_login.json()["detail"] == "Sign in with Google."
+
+
+def test_google_client_id_missing_disables_button_and_endpoint(auth_env, monkeypatch):
+    monkeypatch.delenv("GOOGLE_CLIENT_ID", raising=False)
+
+    config = SyncASGIClient().get("/auth/config")
+    login_page = SyncASGIClient().get("/login")
+    response = SyncASGIClient().post("/auth/google", json={"credential": "mock-google-id-token"})
+
+    assert config.status_code == 200
+    assert config.json()["google_client_id"] == ""
+    assert 'id="googleLogin" hidden' in login_page.text
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Google Sign-In is not configured."
 
 
 def test_register_login_cookie_and_protected_api(auth_env):

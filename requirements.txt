@@ -8,3 +8,4 @@ kagglehub
 pytest
 httpx
 slowapi
+google-auth>=2.0,<3.0

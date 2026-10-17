@@ -27,6 +27,10 @@ class Credentials(BaseModel):
     _email_validator = field_validator("email")(_validate_email)
 
 
+class GoogleCredential(BaseModel):
+    credential: str = Field(min_length=1, max_length=8192)
+
+
 class EmailRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     captcha_token: str | None = Field(default=None, max_length=4096)
@@ -61,6 +65,7 @@ def _set_access_cookie(response: Response, token: str):
 @router.get("/config")
 def auth_config():
     return {
+        "google_client_id": os.getenv("GOOGLE_CLIENT_ID", "").strip(),
         "recaptcha_site_key": os.getenv("RECAPTCHA_SITE_KEY", ""),
         "recaptcha_enabled": bool(
             os.getenv("RECAPTCHA_SITE_KEY")
@@ -82,6 +87,14 @@ def register(request: Request, response: Response, body: Credentials):
 @limiter.limit("10/minute")
 def login(request: Request, response: Response, body: Credentials):
     user, token = auth_service.login(body.email, body.password, body.captcha_token, _client_ip(request))
+    _set_access_cookie(response, token)
+    return {"user": user}
+
+
+@router.post("/google")
+@limiter.limit("10/minute")
+def google_login(request: Request, response: Response, body: GoogleCredential):
+    user, token = auth_service.google_login(body.credential)
     _set_access_cookie(response, token)
     return {"user": user}
 

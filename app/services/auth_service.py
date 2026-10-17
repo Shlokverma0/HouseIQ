@@ -72,6 +72,13 @@ def _connect():
         id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
         token_version INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
     )""")
+    user_columns = {row["name"] for row in connection.execute("PRAGMA table_info(users)")}
+    if "google_sub" not in user_columns:
+        connection.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+    connection.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub "
+        "ON users(google_sub) WHERE google_sub IS NOT NULL"
+    )
     connection.execute("""CREATE TABLE IF NOT EXISTS password_otps (
         id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         otp_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0,
@@ -244,9 +251,103 @@ def login(email: str, password: str, captcha_token: str | None, remote_ip: str |
     email = _normalise_email(email)
     with _db() as db:
         user = db.execute("SELECT id,email,password_hash,token_version FROM users WHERE email=?", (email,)).fetchone()
+    if user and not user["password_hash"]:
+        raise HTTPException(status_code=401, detail="Sign in with Google.")
     if not user or not _verify_password(password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Email or password is incorrect.")
     return {"id": user["id"], "email": user["email"]}, _issue_access(user["id"], user["email"], user["token_version"])
+
+
+def _verify_google_id_token(credential: str) -> dict:
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    if not client_id:
+        raise HTTPException(status_code=503, detail="Google Sign-In is not configured.")
+    try:
+        from google.auth.transport.requests import Request as GoogleRequest
+        from google.oauth2 import id_token
+
+        claims = id_token.verify_oauth2_token(credential, GoogleRequest(), audience=client_id)
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail="Google Sign-In dependency is unavailable.") from exc
+    except ValueError as exc:
+        reason = str(exc).lower()
+        if "audience" in reason or "recipient" in reason:
+            detail = "Google ID token audience does not match this app."
+        elif "expired" in reason:
+            detail = "Google ID token has expired."
+        else:
+            detail = "Google ID token is invalid. Sign in with Google again."
+        raise HTTPException(status_code=401, detail=detail) from exc
+    except Exception as exc:
+        # Certificate fetch/network errors are transient; never include token data.
+        raise HTTPException(status_code=503, detail="Google Sign-In could not be verified right now. Try again.") from exc
+
+    if claims.get("iss") not in {"accounts.google.com", "https://accounts.google.com"}:
+        raise HTTPException(status_code=401, detail="Google ID token issuer is invalid.")
+    audience = claims.get("aud")
+    if client_id not in (audience if isinstance(audience, list) else [audience]):
+        raise HTTPException(status_code=401, detail="Google ID token audience does not match this app.")
+    try:
+        expires_at = int(claims.get("exp", 0))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="Google ID token expiry is invalid.") from exc
+    if expires_at <= int(time.time()):
+        raise HTTPException(status_code=401, detail="Google ID token has expired.")
+    if claims.get("email_verified") is not True:
+        raise HTTPException(status_code=401, detail="Google account email is not verified.")
+    email = claims.get("email")
+    subject = claims.get("sub")
+    if not isinstance(email, str) or not email.strip() or not isinstance(subject, str) or not subject.strip():
+        raise HTTPException(status_code=401, detail="Google ID token is missing account details.")
+    return {"email": _normalise_email(email), "sub": subject}
+
+
+def google_login(credential: str) -> tuple[dict, str]:
+    """Verify a GIS ID token and sign in or link the verified Google identity."""
+    _secret()
+    identity = _verify_google_id_token(credential)
+    email, subject = identity["email"], identity["sub"]
+    now = int(time.time())
+    with _db() as db:
+        user = db.execute(
+            "SELECT id,email,password_hash,token_version,google_sub FROM users WHERE google_sub=?",
+            (subject,),
+        ).fetchone()
+        if user:
+            if user["email"] != email:
+                email_owner = db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+                if email_owner and email_owner["id"] != user["id"]:
+                    raise HTTPException(status_code=409, detail="This Google account email is linked to another HouseIQ account.")
+                db.execute("UPDATE users SET email=? WHERE id=?", (email, user["id"]))
+                user = db.execute(
+                    "SELECT id,email,password_hash,token_version,google_sub FROM users WHERE id=?",
+                    (user["id"],),
+                ).fetchone()
+        else:
+            user = db.execute(
+                "SELECT id,email,password_hash,token_version,google_sub FROM users WHERE email=?",
+                (email,),
+            ).fetchone()
+            if user:
+                if user["google_sub"] and user["google_sub"] != subject:
+                    raise HTTPException(status_code=409, detail="This HouseIQ account is already linked to a different Google account.")
+                db.execute("UPDATE users SET google_sub=? WHERE id=?", (subject, user["id"]))
+                user = db.execute(
+                    "SELECT id,email,password_hash,token_version,google_sub FROM users WHERE id=?",
+                    (user["id"],),
+                ).fetchone()
+            else:
+                cursor = db.execute(
+                    "INSERT INTO users(email,password_hash,token_version,created_at,google_sub) VALUES(?,?,0,?,?)",
+                    (email, "", now, subject),
+                )
+                user = db.execute(
+                    "SELECT id,email,password_hash,token_version,google_sub FROM users WHERE id=?",
+                    (cursor.lastrowid,),
+                ).fetchone()
+    return {"id": user["id"], "email": user["email"]}, _issue_access(
+        user["id"], user["email"], user["token_version"]
+    )
 
 
 def current_user(request: FastAPIRequest) -> dict:

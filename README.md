@@ -20,6 +20,7 @@ The login screenshot below has been cropped and its personal form entries remove
 - Displays a separate **Demo ML estimate** for comparison. It uses a synthetic Kaggle dataset and is not the main estimate.
 - Builds an assumptions-based future scenario (up to 50 years) from inflation, GDP growth, migration, and interest. It is not city-specific; long-run growth moves toward inflation.
 - Provides account registration/sign-in, signed HttpOnly JWT session cookies, password reset by emailed one-time code, and Google reCAPTCHA Enterprise score checks when configured.
+- Supports optional Google Sign-In through Google Identity Services; the backend verifies the Google ID token before linking or creating an account.
 - Validates inputs in the browser and API, and exposes API docs through Swagger UI.
 
 ## Screens and request flow
@@ -52,7 +53,7 @@ Forecast growth uses the supplied inflation, GDP growth, migration, and interest
 | Validation | Pydantic |
 | ML and data | scikit-learn, pandas, joblib |
 | Auth storage | SQLite |
-| Auth security | scrypt password hashes, HMAC-signed HS256 JWT cookies |
+| Auth security | scrypt password hashes, HMAC-signed HS256 JWT cookies, Google ID token verification (`google-auth`) |
 | CAPTCHA and email | Google reCAPTCHA Enterprise assessments, SMTP OTP email |
 | Tests | pytest, httpx |
 
@@ -105,6 +106,7 @@ For local development, CAPTCHA is disabled if all reCAPTCHA settings are omitted
 | `POST` | `/predict/future` | Current estimate plus forecast |
 | `POST` | `/auth/register` | Create account |
 | `POST` | `/auth/login` | Sign in |
+| `POST` | `/auth/google` | Verify Google ID token and sign in/link account |
 | `POST` | `/auth/logout` | Sign out |
 | `POST` | `/auth/forgot-password` | Request email OTP |
 | `POST` | `/auth/verify-reset-otp` | Verify reset OTP |
@@ -139,12 +141,25 @@ The app is a single FastAPI web service; deploy the repository root, not `web/` 
    | `SMTP_FROM` | Verified sender address |
    | `HOUSEIQ_DEMO_EMAIL` | Optional demo account email; omit with its password to disable the demo account |
    | `HOUSEIQ_DEMO_PASSWORD` | Optional 10–128 character demo password; stored only as a password hash |
+   | `GOOGLE_CLIENT_ID` | Optional Google OAuth 2.0 Web application client ID; no client secret is used |
 
    If both demo variables are set, startup creates that account without an email OTP (signup currently has no email-verification step). On later startups, only that configured account's password hash is synchronized if the configured password changed. Other users are not modified. The password is never logged. If either variable is missing or empty, no demo user is created and the app starts normally.
 
    Do not copy `.env` into the repository or paste secrets into GitHub. In Google reCAPTCHA settings, add the exact deployed `onrender.com` hostname to the key's allowed domains. After saving environment variables, redeploy and check Render logs and `/health`.
 
 5. Open the generated `https://<service-name>.onrender.com/login`, create an account, then test the estimate screen, CAPTCHA, and API docs. Put the final URL in the Live Demo line at the top of this README and in your resume.
+
+### Optional Google Sign-In setup
+
+1. In Google Cloud Console, configure the **OAuth consent screen** and create an OAuth client with application type **Web application**.
+2. Add these **Authorized JavaScript origins** (origins only; no URL path):
+   - `http://localhost:8000`
+   - `http://127.0.0.1:8000`
+   - `https://houseiq-1ttf.onrender.com`
+3. Set the generated Web application **Client ID** as `GOOGLE_CLIENT_ID` in the local environment or Render environment variables. Do not set a client secret; this GIS ID-token flow does not use one.
+4. If the OAuth consent screen is in **Testing** mode, only accounts added under **Test users** can sign in. Publish/configure the consent screen as appropriate before allowing general users.
+
+When `GOOGLE_CLIENT_ID` is empty or missing, the Google buttons stay hidden and password authentication works as usual. Google sign-in posts the ID token to `/auth/google`; the backend validates its signature, audience, issuer, expiry, and verified email before creating an account or linking the Google identity to the matching email account.
 
 ### Hosting notes for this app
 
