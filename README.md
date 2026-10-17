@@ -4,7 +4,7 @@
 
 > **Demo limitations:** City reference rates are listing/reference prices, not registered sale prices. The ML training data is synthetic and its estimate is not comparable to real market prices. Forecasts are scenarios, not valuations or guarantees.
 
-**Live demo:** [HouseIQ on Render](https://houseiq-1ttf.onrender.com/login) · **API docs:** [Swagger UI](https://houseiq-1ttf.onrender.com/docs)
+**Live app:** [HouseIQ login](https://houseiq-1ttf.onrender.com/login) · **Backend root:** [HouseIQ API](https://houseiq-1ttf.onrender.com) · **API docs:** [Swagger UI](https://houseiq-1ttf.onrender.com/docs)
 
 ## Screenshots
 
@@ -147,7 +147,7 @@ The app is a single FastAPI web service; deploy the repository root, not `web/` 
 
    Do not copy `.env` into the repository or paste secrets into GitHub. In Google reCAPTCHA settings, add the exact deployed `onrender.com` hostname to the key's allowed domains. After saving environment variables, redeploy and check Render logs and `/health`.
 
-5. Open the generated `https://<service-name>.onrender.com/login`, create an account, then test the estimate screen, CAPTCHA, and API docs. Put the final URL in the Live Demo line at the top of this README and in your resume.
+5. Open [HouseIQ login](https://houseiq-1ttf.onrender.com/login), create an account, then test the estimate screen, CAPTCHA, and [API docs](https://houseiq-1ttf.onrender.com/docs). The backend root is [https://houseiq-1ttf.onrender.com](https://houseiq-1ttf.onrender.com).
 
 ### Optional Google Sign-In setup
 
@@ -170,4 +170,4 @@ Render Free services sleep after inactivity and use an ephemeral filesystem: the
 After deployment succeeds, use a truthful entry such as:
 
 > **HouseIQ — Indian Property Estimate & Forecast App** | Python, FastAPI, scikit-learn, SQLite
-> Built a web app that estimates property values from sourced city reference rates, compares results with a synthetic-data ML model, and generates assumption-based forecasts. Implemented validated prediction APIs, account authentication, email OTP password reset, and CAPTCHA integration. **Live:** `<your deployed URL>` · **Code:** `https://github.com/Shlokverma0/HouseIQ`
+> Built a web app that estimates property values from sourced city reference rates, compares results with a synthetic-data ML model, and generates assumption-based forecasts. Implemented validated prediction APIs, account authentication, email OTP password reset, and CAPTCHA integration. **Live:** `https://houseiq-1ttf.onrender.com/login` · **Code:** `https://github.com/Shlokverma0/HouseIQ`
