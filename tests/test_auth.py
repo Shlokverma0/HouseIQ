@@ -8,6 +8,7 @@ import httpx
 import pytest
 
 from app.main import app
+from app.repositories.model_repository import model_repository
 from app.services import auth_service
 
 
@@ -47,6 +48,87 @@ def auth_env(monkeypatch):
     monkeypatch.setattr(auth_service, "verify_captcha", lambda token, ip=None, expected_action=None: True)
     yield db_path
     db_path.unlink(missing_ok=True)
+
+
+def _run_startup(monkeypatch):
+    from app.main import lifespan
+
+    monkeypatch.setattr(model_repository, "load", lambda: None)
+
+    async def start_and_stop():
+        async with lifespan(app):
+            pass
+
+    asyncio.run(start_and_stop())
+
+
+def test_demo_user_is_created_at_startup_and_can_login_without_smtp(auth_env, monkeypatch):
+    email = "demo@example.test"
+    password = "demo-password-123"
+    monkeypatch.setenv("HOUSEIQ_DEMO_EMAIL", email)
+    monkeypatch.setenv("HOUSEIQ_DEMO_PASSWORD", password)
+
+    _run_startup(monkeypatch)
+
+    with auth_service._db() as db:
+        user = db.execute("SELECT email,password_hash FROM users").fetchone()
+        assert user["email"] == email
+        assert user["password_hash"].startswith("scrypt$")
+        assert auth_service._verify_password(password, user["password_hash"])
+    user, _token = auth_service.login(email, password, captcha_token=None)
+    assert user["email"] == email
+
+
+def test_demo_user_startup_does_not_insert_duplicate(auth_env, monkeypatch):
+    monkeypatch.setenv("HOUSEIQ_DEMO_EMAIL", "demo@example.test")
+    monkeypatch.setenv("HOUSEIQ_DEMO_PASSWORD", "demo-password-123")
+
+    _run_startup(monkeypatch)
+    _run_startup(monkeypatch)
+
+    with auth_service._db() as db:
+        assert db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 1
+
+
+def test_demo_password_change_updates_only_demo_password_hash(auth_env, monkeypatch):
+    monkeypatch.setenv("HOUSEIQ_DEMO_EMAIL", "demo@example.test")
+    monkeypatch.setenv("HOUSEIQ_DEMO_PASSWORD", "demo-password-old")
+    _run_startup(monkeypatch)
+    with auth_service._db() as db:
+        db.execute(
+            "INSERT INTO users(email,password_hash,created_at) VALUES(?,?,?)",
+            ("regular@example.test", auth_service._password_hash("regular-password"), 1),
+        )
+        original_regular_hash = db.execute(
+            "SELECT password_hash FROM users WHERE email=?", ("regular@example.test",)
+        ).fetchone()[0]
+        original_demo_hash = db.execute(
+            "SELECT password_hash FROM users WHERE email=?", ("demo@example.test",)
+        ).fetchone()[0]
+
+    monkeypatch.setenv("HOUSEIQ_DEMO_PASSWORD", "demo-password-new")
+    _run_startup(monkeypatch)
+
+    with auth_service._db() as db:
+        demo_hash = db.execute(
+            "SELECT password_hash FROM users WHERE email=?", ("demo@example.test",)
+        ).fetchone()[0]
+        regular_hash = db.execute(
+            "SELECT password_hash FROM users WHERE email=?", ("regular@example.test",)
+        ).fetchone()[0]
+        assert demo_hash != original_demo_hash
+        assert auth_service._verify_password("demo-password-new", demo_hash)
+        assert not auth_service._verify_password("demo-password-old", demo_hash)
+        assert regular_hash == original_regular_hash
+
+
+def test_demo_user_not_created_when_environment_is_missing(auth_env, monkeypatch):
+    monkeypatch.delenv("HOUSEIQ_DEMO_EMAIL", raising=False)
+    monkeypatch.delenv("HOUSEIQ_DEMO_PASSWORD", raising=False)
+
+    _run_startup(monkeypatch)
+
+    assert not auth_env.exists()
 
 
 def test_register_login_cookie_and_protected_api(auth_env):

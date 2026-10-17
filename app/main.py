@@ -22,7 +22,7 @@ import json
 
 from app.routes.predict import router as predict_router
 from app.routes.auth import router as auth_router
-from app.services.auth_service import current_user
+from app.services.auth_service import current_user, ensure_demo_user
 from app.repositories.model_repository import model_repository
 from app.utils.logger import logger
 from app.utils.limiter import limiter
@@ -43,6 +43,8 @@ def _json_safe_validation_details(value):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting up HouseIQ...")
+    if ensure_demo_user():
+        logger.info("Configured demo account is ready.")
     model_repository.load()
     logger.info("API ready to serve requests.")
     yield

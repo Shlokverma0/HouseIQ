@@ -137,6 +137,10 @@ The app is a single FastAPI web service; deploy the repository root, not `web/` 
    | `SMTP_USERNAME` | SMTP username |
    | `SMTP_PASSWORD` | SMTP/app password; keep private |
    | `SMTP_FROM` | Verified sender address |
+   | `HOUSEIQ_DEMO_EMAIL` | Optional demo account email; omit with its password to disable the demo account |
+   | `HOUSEIQ_DEMO_PASSWORD` | Optional 10–128 character demo password; stored only as a password hash |
+
+   If both demo variables are set, startup creates that account without an email OTP (signup currently has no email-verification step). On later startups, only that configured account's password hash is synchronized if the configured password changed. Other users are not modified. The password is never logged. If either variable is missing or empty, no demo user is created and the app starts normally.
 
    Do not copy `.env` into the repository or paste secrets into GitHub. In Google reCAPTCHA settings, add the exact deployed `onrender.com` hostname to the key's allowed domains. After saving environment variables, redeploy and check Render logs and `/health`.
 
@@ -144,7 +148,7 @@ The app is a single FastAPI web service; deploy the repository root, not `web/` 
 
 ### Hosting notes for this app
 
-Render Free services sleep after inactivity and use an ephemeral filesystem: the SQLite account database can be lost on restart, spin-down, or redeploy. Free web services also block outbound SMTP ports 25, 465, and 587, so this app's current SMTP password-reset flow will not work on the free tier with those ports. See [Render's free-service limits](https://render.com/docs/free). For a durable public demo, use a persistent database (for example, migrate auth storage to managed Postgres) and an email delivery provider/plan supported by your host. The current code uses SQLite and direct SMTP; do not present those as production-durable until migrated and verified.
+Render Free services sleep after inactivity and use an ephemeral filesystem: the SQLite account database can be lost on restart, spin-down, or redeploy. The optional environment-configured demo account is recreated/synchronized at startup, but other accounts and their data can disappear. Free web services also block outbound SMTP ports 25, 465, and 587, so this app's current SMTP password-reset flow will not work on the free tier with those ports. See [Render's free-service limits](https://render.com/docs/free). For a durable public demo, use a persistent database (for example, migrate auth storage to managed Postgres) and an email delivery provider/plan supported by your host. The current code uses SQLite and direct SMTP; do not present those as production-durable until migrated and verified.
 
 ## Resume entry
 

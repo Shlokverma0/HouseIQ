@@ -209,6 +209,36 @@ def register(email: str, password: str, captcha_token: str | None, remote_ip: st
     return {"id": user_id, "email": email}, _issue_access(user_id, email)
 
 
+def ensure_demo_user() -> bool:
+    """Create or synchronize only the explicitly configured demo account.
+
+    Demo accounts do not use the signup flow, so no email/SMTP verification is
+    needed. The app currently has no separate email-verification state.
+    """
+    email = _normalise_email(os.getenv("HOUSEIQ_DEMO_EMAIL", ""))
+    password = os.getenv("HOUSEIQ_DEMO_PASSWORD", "")
+    if not email or not password:
+        return False
+    if len(password) < 10 or len(password) > 128:
+        raise ValueError("HOUSEIQ_DEMO_PASSWORD must be 10–128 characters long.")
+
+    with _db() as db:
+        user = db.execute(
+            "SELECT id,password_hash FROM users WHERE email=?", (email,)
+        ).fetchone()
+        if user is None:
+            db.execute(
+                "INSERT INTO users(email,password_hash,created_at) VALUES(?,?,?)",
+                (email, _password_hash(password), int(time.time())),
+            )
+        elif not _verify_password(password, user["password_hash"]):
+            db.execute(
+                "UPDATE users SET password_hash=? WHERE id=?",
+                (_password_hash(password), user["id"]),
+            )
+    return True
+
+
 def login(email: str, password: str, captcha_token: str | None, remote_ip: str | None = None) -> tuple[dict, str]:
     _require_captcha(captcha_token, remote_ip, "login")
     email = _normalise_email(email)
